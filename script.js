@@ -25,7 +25,10 @@ async function setupCamera() {
   });
   video.srcObject = stream;
   return new Promise(resolve => {
-    video.onloadedmetadata = () => resolve(video);
+    video.onloadedmetadata = () => {
+      video.play();
+      resolve(video);
+    };
   });
 }
 
@@ -83,7 +86,6 @@ startBtn.addEventListener("click", async () => {
   await tf.setBackend("webgl");
   await tf.ready();
   await setupCamera();
-  await video.play();
 
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
