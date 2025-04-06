@@ -2,28 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pose Matching Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Pose Game</title>
   <style>
     html, body {
       margin: 0;
       padding: 0;
+      overflow: hidden;
       background: black;
       color: white;
       font-family: sans-serif;
       text-align: center;
-      overflow: hidden;
     }
-    #video, #canvas {
+    canvas {
       position: absolute;
       top: 0; left: 0;
       width: 100vw;
       height: 100vh;
     }
-    #startBtn {
+    button {
       position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
       padding: 1em 2em;
       font-size: 1.2em;
       background: #4CAF50;
@@ -32,132 +30,36 @@
       border-radius: 12px;
       z-index: 10;
     }
-    #poseImage {
+    #startBtn {
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    #status {
+      top: 1em;
+      left: 1em;
       position: absolute;
-      top: 10px; right: 10px;
-      width: 150px;
-      border: 3px solid white;
-      border-radius: 10px;
-      z-index: 5;
+      font-size: 1.1em;
+      z-index: 10;
+    }
+    #targetPoseImg {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      width: 200px;
+      border: 2px solid white;
+      z-index: 10;
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.16.0"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
 </head>
 <body>
-  <button id="startBtn">開始遊戲</button>
-  <img id="poseImage" src="" alt="Pose" />
-  <video id="video" autoplay playsinline style="display: none;"></video>
+  <button id="startBtn">開始偵測</button>
+  <div id="status"></div>
+  <video id="video" autoplay playsinline muted style="display: none;"></video>
   <canvas id="canvas"></canvas>
-
-  <script>
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const startBtn = document.getElementById('startBtn');
-    const poseImage = document.getElementById('poseImage');
-
-    let detector;
-    let currentPoseIndex = 0;
-    let standardKeypointsList = [];
-
-    const totalPoses = 8;
-    const SIMILARITY_THRESHOLD = 0.85;
-
-    function euclideanDistance(a, b) {
-      return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
-    }
-
-    function compareKeypoints(kp1, kp2) {
-      let totalDist = 0;
-      let count = 0;
-      for (let i = 0; i < kp1.length; i++) {
-        if (kp1[i].score > 0.4 && kp2[i].score > 0.4) {
-          totalDist += euclideanDistance(kp1[i], kp2[i]);
-          count++;
-        }
-      }
-      return count > 0 ? 1 - (totalDist / count) / 100 : 0; // 越高越像
-    }
-
-    async function loadStandardPoses() {
-      for (let i = 1; i <= totalPoses; i++) {
-        const res = await fetch(`poses/pose${i}.json`);
-        const data = await res.json();
-        standardKeypointsList.push(data);
-      }
-    }
-
-    function updatePoseImage(index) {
-      poseImage.src = `poses/pose${index + 1}.png`;
-    }
-
-    async function setupCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' },
-        audio: false
-      });
-      video.srcObject = stream;
-      return new Promise(resolve => {
-        video.onloadedmetadata = () => resolve(video);
-      });
-    }
-
-    async function main() {
-      await tf.setBackend('webgl');
-      await tf.ready();
-      await loadStandardPoses();
-      updatePoseImage(currentPoseIndex);
-      await setupCamera();
-      await video.play();
-
-      detector = await poseDetection.createDetector(
-        poseDetection.SupportedModels.MoveNet,
-        { modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING }
-      );
-
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      requestAnimationFrame(detect);
-    }
-
-    async function detect() {
-      const poses = await detector.estimatePoses(video);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      if (poses.length > 0) {
-        const keypoints = poses[0].keypoints;
-
-        // 畫紅點
-        keypoints.forEach((kp) => {
-          if (kp.score > 0.4) {
-            ctx.beginPath();
-            ctx.arc(kp.x, kp.y, 6, 0, 2 * Math.PI);
-            ctx.fillStyle = 'red';
-            ctx.fill();
-          }
-        });
-
-        // 比對姿勢
-        const similarity = compareKeypoints(keypoints, standardKeypointsList[currentPoseIndex]);
-        if (similarity > SIMILARITY_THRESHOLD) {
-          currentPoseIndex++;
-          if (currentPoseIndex < totalPoses) {
-            updatePoseImage(currentPoseIndex);
-          } else {
-            alert('恭喜完成所有動作！');
-            return;
-          }
-        }
-      }
-      requestAnimationFrame(detect);
-    }
-
-    startBtn.addEventListener('click', async () => {
-      startBtn.style.display = 'none';
-      await main();
-    });
-  </script>
+  <img id="targetPoseImg" src="" style="display: none;" />
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.16.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@0.0.5/dist/pose-detection.min.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
